@@ -81,9 +81,57 @@ module Syntax = struct
     | TFun (u, v) -> StringSet.union (free_type_vars u) (free_type_vars v)
 end
 
-module Fresh = struct
-  let fresh_name index =
+module Context = struct
+  (* Type-only markers for GADTs *)
+  type complete
+  type incomplete
+
+  (* Variants of context elements *)
+  type 'a element =
+    | CVar : string * Syntax.poly Syntax.type_t -> 'a element
+    | CForall : string -> 'a element
+    | CExists : string -> incomplete element
+    | CSolved : string * Syntax.mono Syntax.type_t -> 'a element
+    | CMarker : string -> 'a element
+
+  (* A context is simply a reversed linked list *)
+  type 'a t = 'a element list
+
+  (* [empty] is a context with no elements *)
+  let (empty : 'a t) = []
+
+  (* [(|>)] appends an element to the tail of the context *)
+  let (|>) (es : 'a t) (e : 'a element) : 'a t = e :: es
+
+  (* [popUntil e es] pops items from the context until before e  *)
+  let popUntil (e : 'a element) =
+    let rec aux = function
+      | [] -> None
+      | x :: xs -> if (x = e) then Some xs else aux xs in
+    aux
+
+  (* [breakAt e es] breaks apart a context at some element e *)
+  let breakAt (e : 'a element) =
+    let rec aux ys = function
+      | [] -> None
+      | x :: xs -> if (x = e) then Some (List.rev ys, xs) else aux (x :: ys) xs in
+    aux []
+
+  (* [collect predicate] collects type variables from the context given
+     a predicate. *)
+  let collect (predicate : string list -> 'a element -> string list) : 'a t -> string list =
+    List.fold_left predicate []
+end
+
+class fresh = object
+  val mutable index = 0
+
+  method fresh =
     let prefix = String.make 1 (Char.chr (97 + index / 26)) in
     let suffix = string_of_int (index mod 26) in
+    index <- index + 1;
     String.cat prefix suffix
+
+  method reset =
+    index <- 0
 end
