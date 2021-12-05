@@ -80,3 +80,10 @@ module Syntax = struct
     | TForall (v, t) -> StringSet.remove v (free_type_vars t)
     | TFun (u, v) -> StringSet.union (free_type_vars u) (free_type_vars v)
 end
+
+module Fresh = struct
+  let fresh_name index =
+    let prefix = String.make 1 (Char.chr (97 + index / 26)) in
+    let suffix = string_of_int (index mod 26) in
+    String.cat prefix suffix
+end
