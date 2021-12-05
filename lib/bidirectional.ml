@@ -1,3 +1,5 @@
+module StringSet = Set.Make(String)
+
 module Syntax = struct
   (* Type-only markers for GADTs *)
   type mono
@@ -50,4 +52,31 @@ module Syntax = struct
        if n = v then TForall (v, u) else TForall (v, type_subst t n u)
     | TFun (u, v) ->
        TFun (type_subst t n u, type_subst t n v)
+
+  (* [monotype t] determines whether a type t is a monotype at runtime. *)
+  let rec (monotype : 'a type_t -> mono type_t option) = function
+    | TUnit -> Some TUnit
+    | TVar v -> Some (TVar v)
+    | TExists v -> Some (TExists v)
+    | TForall _ -> None
+    | TFun (u, v) ->
+       match (monotype u, monotype v) with
+       | (Some u', Some v') -> Some (TFun (u', v'))
+       | _ -> None
+
+  (* [polytype t] determines whether a type t is a polytype at runtime. *)
+  let rec (polytype : 'a type_t -> poly type_t) = function
+    | TUnit -> TUnit
+    | TVar v -> TVar v
+    | TExists v -> TExists v
+    | TForall (v, t) -> TForall (v, t)
+    | TFun (u, v) -> TFun (polytype u, polytype v)
+
+  (* [free_type_vars t] collects the free type variables in some type t. *)
+  let rec free_type_vars = function
+    | TUnit -> StringSet.empty
+    | TVar v -> StringSet.singleton v
+    | TExists v -> StringSet.singleton v
+    | TForall (v, t) -> StringSet.remove v (free_type_vars t)
+    | TFun (u, v) -> StringSet.union (free_type_vars u) (free_type_vars v)
 end
