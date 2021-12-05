@@ -1,25 +1,21 @@
 module StringSet = Set.Make(String)
 
 module Syntax = struct
-  (* Type-only markers for GADTs *)
-  type mono
-  type poly
-
   (* Variants of expressions. *)
   type expr_t =
     | EUnit
     | EVar of string
     | EAbs of string * expr_t
     | EApp of expr_t * expr_t
-    | EAnn of expr_t * poly type_t
+    | EAnn of expr_t * type_t
 
   (* Variants of types. *)
-  and 'a type_t =
-    | TUnit : 'a type_t
-    | TVar : string -> 'a type_t
-    | TExists : string -> 'a type_t
-    | TForall : string * poly type_t -> poly type_t
-    | TFun : 'a type_t * 'a type_t -> 'a type_t
+  and type_t =
+    | TUnit : type_t
+    | TVar : string -> type_t
+    | TExists : string -> type_t
+    | TForall : string * type_t -> type_t
+    | TFun : type_t * type_t -> type_t
 
   (* [expr_subst e n] substitutes all occurences of n with e. *)
   let rec expr_subst (e : expr_t) (n : string) = function
@@ -38,7 +34,7 @@ module Syntax = struct
        EAnn (expr_subst e n v, t)
 
   (* [type_subst e n] substitutes all occurences of n with t. *)
-  let rec type_subst (t : _ type_t) (n : string) = function
+  let rec type_subst (t : type_t) (n : string) = function
     | TUnit ->
        TUnit
     | TVar v ->
@@ -54,7 +50,7 @@ module Syntax = struct
        TFun (type_subst t n u, type_subst t n v)
 
   (* [monotype t] determines whether a type t is a monotype at runtime. *)
-  let rec (monotype : 'a type_t -> mono type_t option) = function
+  let rec (monotype : type_t -> type_t option) = function
     | TUnit -> Some TUnit
     | TVar v -> Some (TVar v)
     | TExists v -> Some (TExists v)
@@ -65,7 +61,7 @@ module Syntax = struct
        | _ -> None
 
   (* [polytype t] determines whether a type t is a polytype at runtime. *)
-  let rec (polytype : 'a type_t -> poly type_t) = function
+  let rec (polytype : type_t -> type_t) = function
     | TUnit -> TUnit
     | TVar v -> TVar v
     | TExists v -> TExists v
@@ -82,36 +78,32 @@ module Syntax = struct
 end
 
 module Context = struct
-  (* Type-only markers for GADTs *)
-  type complete
-  type incomplete
-
   (* Variants of context elements *)
-  type 'a element =
-    | CVar : string * Syntax.poly Syntax.type_t -> 'a element
-    | CForall : string -> 'a element
-    | CExists : string -> incomplete element
-    | CSolved : string * Syntax.mono Syntax.type_t -> 'a element
-    | CMarker : string -> 'a element
+  type element =
+    | CVar : string * Syntax.type_t -> element
+    | CForall : string -> element
+    | CExists : string -> element
+    | CSolved : string * Syntax.type_t -> element
+    | CMarker : string -> element
 
   (* A context is simply a reversed linked list *)
-  type 'a t = 'a element list
+  type t = element list
 
   (* [empty] is a context with no elements *)
-  let (empty : 'a t) = []
+  let (empty : t) = []
 
   (* [(|>)] appends an element to the tail of the context *)
-  let (|>) (es : 'a t) (e : 'a element) : 'a t = e :: es
+  let (|>) (es : t) (e : element) : t = e :: es
 
   (* [popUntil e es] pops items from the context until before e  *)
-  let popUntil (e : 'a element) =
+  let popUntil (e : element) =
     let rec aux = function
       | [] -> None
       | x :: xs -> if (x = e) then Some xs else aux xs in
     aux
 
   (* [breakAt e es] breaks apart a context at some element e *)
-  let breakAt (e : 'a element) =
+  let breakAt (e : element) =
     let rec aux ys = function
       | [] -> None
       | x :: xs -> if (x = e) then Some (List.rev ys, xs) else aux (x :: ys) xs in
@@ -119,8 +111,67 @@ module Context = struct
 
   (* [collect predicate] collects type variables from the context given
      a predicate. *)
-  let collect (predicate : string list -> 'a element -> string list) : 'a t -> string list =
+  let collect (predicate : string list -> element -> string list) : t -> string list =
     List.fold_left predicate []
+end
+
+module WellFormed = struct
+  let rec well_formed_type (context : Context.t) : Syntax.type_t -> bool = function
+    | TUnit -> true
+    | TVar v ->
+       let predicate xs = function
+         | Context.CForall x -> x :: xs
+         | _ -> xs in
+       List.mem v (Context.collect predicate context)
+    | TExists v ->
+       let predicate xs = function
+         | Context.CExists x -> x :: xs
+         | _ -> xs in
+       List.mem v (Context.collect predicate context)
+    | TForall (v, t) ->
+       well_formed_type Context.(context |> CForall v) t
+    | TFun (u, v) ->
+       well_formed_type context u && well_formed_type context v
+
+  let rec well_formed_context = function
+    | [] -> true
+    | e :: es ->
+       let head =
+         match e with
+         | Context.CVar (v, t) ->
+            let predicate xs = function
+              | Context.CVar (x, _) -> x :: xs
+              | _ -> xs in
+            not (List.mem v (Context.collect predicate es)) && well_formed_type es t
+
+         | Context.CForall v ->
+            let predicate xs = function
+              | Context.CForall x -> x :: xs
+              | _ -> xs in
+            not (List.mem v (Context.collect predicate es))
+
+         | Context.CExists v ->
+            let predicate xs = function
+              | Context.CExists x -> x :: xs
+              | Context.CSolved (x, _) -> x :: xs
+              | _ -> xs in
+            not (List.mem v (Context.collect predicate es))
+
+         | Context.CSolved (v, t) ->
+            let predicate xs = function
+              | Context.CExists x -> x :: xs
+              | Context.CSolved (x, _) -> x :: xs
+              | _ -> xs in
+            not (List.mem v (Context.collect predicate es)) && well_formed_type es t
+
+         | Context.CMarker v ->
+            let predicate xs = function
+              | Context.CMarker x -> x :: xs
+              | _ -> xs in
+            not (List.mem v (Context.collect predicate es))
+
+       in head && well_formed_context es
+
 end
 
 class fresh = object
