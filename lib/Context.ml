@@ -1,27 +1,30 @@
-type element =
-  | CVar : string * Syntax.type_t -> element
-  | CForall : string -> element
-  | CExists : string -> element
-  | CSolved : string * Syntax.type_t -> element
-  | CMarker : string -> element
+type complete
+type incomplete
 
-type t = element list
+type 'a element =
+  | CVar : string * Syntax.poly Syntax.type_t -> 'a element
+  | CForall : string -> 'a element
+  | CExists : string -> incomplete element
+  | CSolved : string * Syntax.mono Syntax.type_t -> 'a element
+  | CMarker : string -> 'a element
 
-let (empty : t) = []
+type 'a t = 'a element list
 
-let (|>) (es : t) (e : element) : t = e :: es
+let empty : type a. a t = []
 
-let popUntil (e : element) =
+let (|>) (type a) (es : a t) (e : a element) : a t = e :: es
+
+let popUntil (type a) (e : a element) =
   let rec aux = function
     | [] -> None
     | x :: xs -> if (x = e) then Some xs else aux xs in
   aux
 
-let breakAt (e : element) =
+let breakAt (type a) (e : a element) =
   let rec aux ys = function
     | [] -> None
     | x :: xs -> if (x = e) then Some (List.rev ys, xs) else aux (x :: ys) xs in
   aux []
 
-let collect (predicate : string list -> element -> string list) : t -> string list =
+let collect (type a) (predicate : string list -> a element -> string list) : a t -> string list =
   List.fold_left predicate []

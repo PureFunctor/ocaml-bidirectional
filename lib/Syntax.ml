@@ -1,18 +1,21 @@
 module StringSet = Set.Make(String)
 
+type mono
+type poly
+
 type expr_t =
   | EUnit
   | EVar of string
   | EAbs of string * expr_t
   | EApp of expr_t * expr_t
-  | EAnn of expr_t * type_t
+  | EAnn of expr_t * poly type_t
 
-and type_t =
-  | TUnit : type_t
-  | TVar : string -> type_t
-  | TExists : string -> type_t
-  | TForall : string * type_t -> type_t
-  | TFun : type_t * type_t -> type_t
+and 'a type_t =
+  | TUnit : 'a type_t
+  | TVar : string -> 'a type_t
+  | TExists : string -> 'a type_t
+  | TForall : string * poly type_t -> poly type_t
+  | TFun : 'a type_t * 'a type_t -> 'a type_t
 
 let rec expr_subst (e : expr_t) (n : string) = function
   | EUnit ->
@@ -29,7 +32,8 @@ let rec expr_subst (e : expr_t) (n : string) = function
   | EAnn (v, t) ->
      EAnn (expr_subst e n v, t)
 
-let rec type_subst (t : type_t) (n : string) = function
+let rec type_subst : type a. a type_t -> string -> a type_t -> a type_t = fun t n ->
+  function
   | TUnit ->
      TUnit
   | TVar v ->
@@ -44,12 +48,22 @@ let rec type_subst (t : type_t) (n : string) = function
   | TFun (u, v) ->
      TFun (type_subst t n u, type_subst t n v)
 
-let rec is_monotype = function
-  | TUnit -> true
-  | TVar _ -> true
-  | TExists _ -> true
-  | TForall _ -> false
-  | TFun (u, v) -> is_monotype u && is_monotype v
+let rec monotype : type a. a type_t -> a type_t option = function
+  | TUnit -> Some TUnit
+  | TVar v -> Some (TVar v)
+  | TExists v -> Some (TExists v)
+  | TForall _ -> None
+  | TFun (u, v) ->
+     match (monotype u, monotype v) with
+     | (Some u', Some v') -> Some (TFun (u', v'))
+     | _ -> None
+
+let rec polytype : type a. a type_t -> poly type_t = function
+  | TUnit -> TUnit
+  | TVar v -> TVar v
+  | TExists v -> TExists v
+  | TForall (v, t) -> TForall (v, t)
+  | TFun (u, v) -> TFun (polytype u, polytype v)
 
 let rec free_type_vars = function
   | TUnit -> StringSet.empty
