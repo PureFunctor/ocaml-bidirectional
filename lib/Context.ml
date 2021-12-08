@@ -12,6 +12,8 @@ type 'a element =
 
 type 'a t = 'a element list
 
+type error = [ | `CouldNotDropMarker ]
+
 let empty : type a. a t = []
 
 let (|>) (type a) (es : a t) (e : a element) : a t = e :: es
@@ -71,8 +73,8 @@ module Alter = struct
       | x :: xs -> if (x = e) then Some (List.rev ys, xs) else aux (x :: ys) xs in
     aux []
 
-  let drop_marker (type a) (m : a element) (c : a t) =
+  let drop_marker (type a) (m : a element) (c : a t) : (a t, [> error]) result =
     match Base.List.tl (Base.List.drop_while c ~f:(function n -> n != m)) with
-    | Some c' -> c'
-    | None -> failwith "Failed drop_marker operation."
+    | Some c' -> Ok c'
+    | None -> Error `CouldNotDropMarker
 end

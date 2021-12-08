@@ -1,20 +1,32 @@
 open Context
 open Syntax
 
-let rec check_type : type a b. a Context.t -> b type_t -> bool = fun context ->
+type error = [ | `NotWellFormed ]
+
+let (let*) = Result.bind
+
+let rec check_type : type a b. a Context.t -> b type_t -> (unit, [> error]) result = fun context ->
   function
   | TUnit ->
-     true
+     Ok ()
   | TVar v ->
-     List.mem v Context.Query.(collect foralls context)
+     if List.mem v Context.Query.(collect foralls context) then
+       Ok ()
+     else
+       Error `NotWellFormed
   | TExists v ->
-     List.mem v Context.Query.(collect existentials context)
+     if List.mem v Context.Query.(collect existentials context) then
+       Ok ()
+     else
+       Error `NotWellFormed
   | TForall (v, t) ->
      check_type (context |> CForall v) t
   | TFun (u, v) ->
-     check_type context u && check_type context v
+     match check_type context u, check_type context v with
+     | Ok _, Ok _ -> Ok ()
+     | _ -> Error `NotWellFormed
 
-let check_context : type a. a Context.t -> bool = function context ->
+let check_context : type a. a Context.t -> (unit, [> error]) result = function context ->
   let rec aux (continue : bool) : a Context.t -> bool = function
     | _ when not continue -> false
     | [] -> true
@@ -23,7 +35,7 @@ let check_context : type a. a Context.t -> bool = function context ->
          not (List.mem name (Context.Query.collect predicate es)) in
        let continue' = match e with
          | CVar (n, t) ->
-            no_duplicates n Context.Query.vars && check_type es t
+            no_duplicates n Context.Query.vars && Result.is_ok (check_type es t)
 
          | CForall n ->
             no_duplicates n Context.Query.foralls
@@ -32,9 +44,12 @@ let check_context : type a. a Context.t -> bool = function context ->
             no_duplicates n Context.Query.existentials
 
          | CSolved (n, t) ->
-            no_duplicates n Context.Query.existentials && check_type es t
+            no_duplicates n Context.Query.existentials && Result.is_ok (check_type es t)
 
          | CMarker n ->
             no_duplicates n Context.Query.markers
        in aux continue' es
-  in aux true context
+  in if aux true context then
+       Ok ()
+     else
+       Error `NotWellFormed
