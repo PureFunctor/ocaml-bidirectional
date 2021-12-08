@@ -17,6 +17,10 @@ and 'a type_t =
   | TForall : string * poly type_t -> poly type_t
   | TFun : 'a type_t * 'a type_t -> 'a type_t
 
+type monotype_t = mono type_t
+
+type polytype_t = poly type_t
+
 let rec expr_subst (e : expr_t) (n : string) = function
   | EUnit ->
      EUnit

@@ -2,7 +2,7 @@ open Context
 open Syntax
 module StringSet = Set.Make (String)
 
-type error = [ | `SubtypeError of string * poly type_t * poly type_t ]
+type error = [ `SubtypeError of string * poly type_t * poly type_t ]
 
 module type TypeCheckerState = sig
   val index : int ref
@@ -25,39 +25,35 @@ module MkTypeCheckerState () : TypeCheckerState = struct
 end
 
 module type TypeChecker = sig
-  type error' = [ | error | Context.error | WellFormed.error ]
+  type err = [ error | Context.error | WellFormed.error ]
 
   val subtype :
-    incomplete Context.t -> poly type_t -> poly type_t -> (incomplete Context.t, error') result
+    incomplete_t -> polytype_t -> polytype_t -> (incomplete_t, err) result
 
-  val instL :
-    incomplete Context.t -> string -> poly type_t -> (incomplete Context.t, error') result
+  val instL : incomplete_t -> string -> polytype_t -> (incomplete_t, err) result
 
-  val instR :
-    incomplete Context.t -> poly type_t -> string -> (incomplete Context.t, error') result
+  val instR : incomplete_t -> polytype_t -> string -> (incomplete_t, err) result
 
-  val check :
-    incomplete Context.t -> expr_t -> poly type_t -> (incomplete Context.t, error') result
+  val check : incomplete_t -> expr_t -> polytype_t -> (incomplete_t, err) result
 
-  val synth :
-    incomplete Context.t -> expr_t -> (incomplete Context.t * poly type_t, error') result
+  val synth : incomplete_t -> expr_t -> (incomplete_t * polytype_t, err) result
 
   val synthApp :
-    incomplete Context.t ->
-    poly type_t ->
+    incomplete_t ->
+    polytype_t ->
     expr_t ->
-    (incomplete Context.t * poly type_t, error') result
+    (incomplete_t * polytype_t, err) result
 end
 
 module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
-  type error' = [ | error | Context.error | WellFormed.error ]
+  type err = [ error | Context.error | WellFormed.error ]
 
-  let (let*) = Result.bind
+  let ( let* ) = Result.bind
 
   let rec subtype gamma a b =
     let* _ = WellFormed.check_type gamma a in
     let* _ = WellFormed.check_type gamma b in
-    match a, b with
+    match (a, b) with
     | TUnit, TUnit -> Ok gamma
     | TVar n, TVar m when n == m -> Ok gamma
     | TExists n, TExists m when n == m -> Ok gamma
@@ -84,8 +80,7 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
       when List.memq n Context.Query.(collect existentials gamma)
            && not (StringSet.mem n (free_type_vars t)) ->
         instR gamma t n
-    | _, _ ->
-       Error (`SubtypeError ("Invalid case between", a, b))
+    | _, _ -> Error (`SubtypeError ("Invalid case between", a, b))
 
   and instL _ = failwith "unimplemented"
 

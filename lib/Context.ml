@@ -4,13 +4,17 @@ type complete
 type incomplete
 
 type 'a element =
-  | CVar : string * Syntax.poly Syntax.type_t -> 'a element
+  | CVar : string * polytype_t -> 'a element
   | CForall : string -> 'a element
   | CExists : string -> incomplete element
-  | CSolved : string * Syntax.mono Syntax.type_t -> 'a element
+  | CSolved : string * monotype_t -> 'a element
   | CMarker : string -> 'a element
 
 type 'a t = 'a element list
+
+type complete_t = complete t
+
+type incomplete_t = incomplete t
 
 type error = [ | `CouldNotDropMarker ]
 
