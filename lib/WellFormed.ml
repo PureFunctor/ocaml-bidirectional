@@ -30,35 +30,18 @@ let check_context : type a. a Context.t -> bool = function context ->
          not (List.mem name (Context.collect predicate es)) in
        let continue' = match e with
          | CVar (n, t) ->
-            let predicate xs = function
-              | CVar (x, _) -> x :: xs
-              | _ -> xs in
-            no_duplicates n predicate && check_type es t
+            no_duplicates n context_vars && check_type es t
 
          | CForall n ->
-            let predicate xs = function
-              | CForall x -> x :: xs
-              | _ -> xs in
-            no_duplicates n predicate
+            no_duplicates n context_foralls
 
          | CExists n ->
-            let predicate xs = function
-              | CExists x -> x :: xs
-              | CSolved (x, _) -> x :: xs
-              | _ -> xs in
-            no_duplicates n predicate
+            no_duplicates n context_existentials
 
          | CSolved (n, t) ->
-            let predicate (xs : string list) : a Context.element -> string list = function
-              | CExists x -> x :: xs
-              | CSolved (x, _) -> x :: xs
-              | _ -> xs in
-            no_duplicates n predicate && check_type es t
+            no_duplicates n context_existentials && check_type es t
 
          | CMarker n ->
-            let predicate xs = function
-              | CMarker x -> x :: xs
-              | _ -> xs in
-            no_duplicates n predicate
+            no_duplicates n context_markers
        in aux continue' es
   in aux true context
