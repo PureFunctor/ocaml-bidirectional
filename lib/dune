@@ -1,2 +1,3 @@
 (library
- (name bidirectional))
+ (name bidirectional)
+ (libraries base))
