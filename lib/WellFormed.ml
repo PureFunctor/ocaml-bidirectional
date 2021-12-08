@@ -6,16 +6,9 @@ let rec check_type : type a b. a Context.t -> b type_t -> bool = fun context ->
   | TUnit ->
      true
   | TVar v ->
-     let predicate xs = function
-       | CForall x -> x :: xs
-       | _ -> xs in
-     List.mem v (Context.collect predicate context)
+     List.mem v Context.Query.(collect foralls context)
   | TExists v ->
-     let predicate (xs : string list) : a Context.element -> string list = function
-       | CExists x -> x :: xs
-       | CSolved (x, _) -> x :: xs
-       | _ -> xs in
-     List.mem v (Context.collect predicate context)
+     List.mem v Context.Query.(collect existentials context)
   | TForall (v, t) ->
      check_type (context |> CForall v) t
   | TFun (u, v) ->
@@ -27,21 +20,21 @@ let check_context : type a. a Context.t -> bool = function context ->
     | [] -> true
     | e :: es ->
        let no_duplicates name predicate =
-         not (List.mem name (Context.collect predicate es)) in
+         not (List.mem name (Context.Query.collect predicate es)) in
        let continue' = match e with
          | CVar (n, t) ->
-            no_duplicates n context_vars && check_type es t
+            no_duplicates n Context.Query.vars && check_type es t
 
          | CForall n ->
-            no_duplicates n context_foralls
+            no_duplicates n Context.Query.foralls
 
          | CExists n ->
-            no_duplicates n context_existentials
+            no_duplicates n Context.Query.existentials
 
          | CSolved (n, t) ->
-            no_duplicates n context_existentials && check_type es t
+            no_duplicates n Context.Query.existentials && check_type es t
 
          | CMarker n ->
-            no_duplicates n context_markers
+            no_duplicates n Context.Query.markers
        in aux continue' es
   in aux true context

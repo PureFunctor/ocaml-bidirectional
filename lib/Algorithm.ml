@@ -61,19 +61,19 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
         let gamma' = gamma |> CForall n' in
         let u' = type_subst (TVar n') n u in
         let theta = subtype gamma' t u' in
-        drop_marker (CForall n') theta
+        Context.Alter.drop_marker (CForall n') theta
     | TForall (n, t), u ->
         let n' = State.fresh_name () in
         let gamma' = gamma |> CMarker n' |> CExists n' in
         let t' = type_subst (TExists n') n t in
         let theta = subtype gamma' t' u in
-        drop_marker (CMarker n') theta
+        Context.Alter.drop_marker (CMarker n') theta
     | t, TExists n
-      when List.memq n (collect context_existentials gamma)
+      when List.memq n Context.Query.(collect existentials gamma)
            && not (StringSet.mem n (free_type_vars t)) ->
         instL gamma n t
     | TExists n, t
-      when List.memq n (collect context_existentials gamma)
+      when List.memq n Context.Query.(collect existentials gamma)
            && not (StringSet.mem n (free_type_vars t)) ->
         instR gamma t n
     | _, _ -> failwith "Cannot solve subtypes."
