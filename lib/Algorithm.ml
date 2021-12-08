@@ -18,7 +18,7 @@ module MkTypeCheckerState () : TypeCheckerState = struct
   let fresh_name () =
     let prefix = String.make 1 (Char.chr (97 + (!index / 26))) in
     let suffix = string_of_int (!index mod 26) in
-    let _ = index := !index + 1 in
+    incr index;
     String.cat prefix suffix
 
   let reset_index () = index := 0
@@ -62,22 +62,25 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
         subtype theta (apply_context theta b) (apply_context theta y)
     | t, TForall (n, u) ->
         let n' = State.fresh_name () in
-        let gamma' = gamma |> CForall n' in
-        let u' = type_subst (TVar n') n u in
-        let* theta = subtype gamma' t u' in
-        Context.Alter.drop_marker (CForall n') theta
+        let* theta =
+          subtype (gamma |> CForall n') t (type_subst (TVar n') n u)
+        in
+        drop_marker (CForall n') theta
     | TForall (n, t), u ->
         let n' = State.fresh_name () in
-        let gamma' = gamma |> CMarker n' |> CExists n' in
-        let t' = type_subst (TExists n') n t in
-        let* theta = subtype gamma' t' u in
-        Context.Alter.drop_marker (CForall n') theta
+        let* theta =
+          subtype
+            (gamma |> CMarker n' |> CExists n')
+            (type_subst (TExists n') n t)
+            u
+        in
+        drop_marker (CForall n') theta
     | t, TExists n
-      when List.memq n Context.Query.(collect existentials gamma)
+      when List.memq n (collect_existentials gamma)
            && not (StringSet.mem n (free_type_vars t)) ->
         instL gamma n t
     | TExists n, t
-      when List.memq n Context.Query.(collect existentials gamma)
+      when List.memq n (collect_existentials gamma)
            && not (StringSet.mem n (free_type_vars t)) ->
         instR gamma t n
     | _, _ -> Error (`SubtypeError ("Invalid case between", a, b))

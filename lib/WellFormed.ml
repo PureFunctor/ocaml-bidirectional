@@ -10,12 +10,12 @@ let rec check_type : type a b. a Context.t -> b type_t -> (unit, [> error]) resu
   | TUnit ->
      Ok ()
   | TVar v ->
-     if List.mem v Context.Query.(collect foralls context) then
+     if List.mem v (collect_foralls context) then
        Ok ()
      else
        Error `NotWellFormed
   | TExists v ->
-     if List.mem v Context.Query.(collect existentials context) then
+     if List.mem v (collect_existentials context) then
        Ok ()
      else
        Error `NotWellFormed
@@ -31,23 +31,23 @@ let check_context : type a. a Context.t -> (unit, [> error]) result = function c
     | _ when not continue -> false
     | [] -> true
     | e :: es ->
-       let no_duplicates name predicate =
-         not (List.mem name (Context.Query.collect predicate es)) in
+       let no_duplicates name collect =
+         not (List.mem name (collect es)) in
        let continue' = match e with
          | CVar (n, t) ->
-            no_duplicates n Context.Query.vars && Result.is_ok (check_type es t)
+            no_duplicates n collect_vars && Result.is_ok (check_type es t)
 
          | CForall n ->
-            no_duplicates n Context.Query.foralls
+            no_duplicates n collect_foralls
 
          | CExists n ->
-            no_duplicates n Context.Query.existentials
+            no_duplicates n collect_existentials
 
          | CSolved (n, t) ->
-            no_duplicates n Context.Query.existentials && Result.is_ok (check_type es t)
+            no_duplicates n collect_existentials && Result.is_ok (check_type es t)
 
          | CMarker n ->
-            no_duplicates n Context.Query.markers
+            no_duplicates n collect_markers
        in aux continue' es
   in if aux true context then
        Ok ()

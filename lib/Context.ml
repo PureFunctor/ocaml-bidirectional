@@ -38,47 +38,51 @@ let rec apply_context : type a b. a t -> b Syntax.type_t -> Syntax.poly Syntax.t
     | TForall (n, t) -> TForall (n, apply_context gamma t)
     | TFun (a, b) -> TFun (apply_context gamma a, apply_context gamma b)
 
-module Query = struct
-   let collect (type a) (predicate : string list -> a element -> string list) : a t -> string list =
-     List.fold_left predicate []
+let collect (type a) (predicate : string list -> a element -> string list) : a t -> string list =
+  List.fold_left predicate []
 
-   let vars (type a) (xs : string list) : a element -> string list =
-     function
-     | CVar (x, _) -> x :: xs
-     | _ -> xs
+let collect_vars (type a) : a t -> _ = fun context ->
+  let predicate xs : _ element -> _ =
+    function
+    | CVar (x, _) -> x :: xs
+    | _ -> xs
+  in collect predicate context
 
-   let foralls (type a) (xs : string list) : a element -> string list =
-     function
-     | CForall x -> x :: xs
-     | _ -> xs
+let collect_foralls (type a) : a t -> string list = fun context ->
+  let predicate xs : a element -> _ =
+    function
+    | CForall x -> x :: xs
+    | _ -> xs
+  in collect predicate context
 
-   let existentials (type a) (xs : string list) : a element -> string list =
-     function
-     | CExists x -> x :: xs
-     | CSolved (x, _) -> x :: xs
-     | _ -> xs
+let collect_existentials (type a) : a t -> string list = fun context ->
+  let predicate xs : a element -> _ =
+    function
+    | CExists x -> x :: xs
+    | CSolved (x, _) -> x :: xs
+    | _ -> xs
+  in collect predicate context
 
-   let markers (type a) (xs : string list) : a element -> string list =
-     function
-     | CMarker x -> x :: xs
-     | _ -> xs
-end
+let collect_markers (type a) : a t -> string list = fun context ->
+  let predicate xs : a element -> _ =
+    function
+    | CMarker x -> x :: xs
+    | _ -> xs
+  in collect predicate context
 
-module Alter = struct
-  let pop_until (type a) (e : a element) =
-    let rec aux = function
-      | [] -> None
-      | x :: xs -> if (x = e) then Some xs else aux xs in
-    aux
+let pop_until (type a) (e : a element) =
+  let rec aux = function
+    | [] -> None
+    | x :: xs -> if (x = e) then Some xs else aux xs in
+  aux
 
-  let break_at (type a) (e : a element) =
-    let rec aux ys = function
-      | [] -> None
-      | x :: xs -> if (x = e) then Some (List.rev ys, xs) else aux (x :: ys) xs in
-    aux []
+let break_at (type a) (e : a element) =
+  let rec aux ys = function
+    | [] -> None
+    | x :: xs -> if (x = e) then Some (List.rev ys, xs) else aux (x :: ys) xs in
+  aux []
 
-  let drop_marker (type a) (m : a element) (c : a t) : (a t, [> error]) result =
-    match Base.List.tl (Base.List.drop_while c ~f:(function n -> n != m)) with
-    | Some c' -> Ok c'
-    | None -> Error `CouldNotDropMarker
-end
+let drop_marker (type a) (m : a element) (c : a t) : (a t, [> error]) result =
+  match Base.List.tl (Base.List.drop_while c ~f:(function n -> n != m)) with
+  | Some c' -> Ok c'
+  | None -> Error `CouldNotDropMarker
