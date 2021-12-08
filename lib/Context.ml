@@ -83,6 +83,6 @@ let break_at (type a) (e : a element) =
   aux []
 
 let drop_marker (type a) (m : a element) (c : a t) : (a t, [> error]) result =
-  match Base.List.tl (Base.List.drop_while c ~f:(function n -> n != m)) with
+  match Base.List.tl (Base.List.drop_while c ~f:(function n -> n <> m)) with
   | Some c' -> Ok c'
   | None -> Error `CouldNotDropMarker
