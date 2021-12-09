@@ -17,6 +17,8 @@ and 'a type_t =
   | TForall : string * poly type_t -> poly type_t
   | TFun : 'a type_t * 'a type_t -> 'a type_t
 
+type error = [ `NotAMonotype ]
+
 type monotype_t = mono type_t
 
 type polytype_t = poly type_t
@@ -52,15 +54,15 @@ let rec type_subst : type a. a type_t -> string -> a type_t -> a type_t = fun t 
   | TFun (u, v) ->
      TFun (type_subst t n u, type_subst t n v)
 
-let rec monotype : type a. a type_t -> a type_t option = function
-  | TUnit -> Some TUnit
-  | TVar v -> Some (TVar v)
-  | TExists v -> Some (TExists v)
-  | TForall _ -> None
+let rec monotype : type a. a type_t -> (monotype_t, [> error]) result = function
+  | TUnit -> Ok TUnit
+  | TVar v -> Ok (TVar v)
+  | TExists v -> Ok (TExists v)
+  | TForall _ -> Error `NotAMonotype
   | TFun (u, v) ->
      match (monotype u, monotype v) with
-     | (Some u', Some v') -> Some (TFun (u', v'))
-     | _ -> None
+     | (Ok u', Ok v') -> Ok (TFun (u', v'))
+     | _ -> Error `NotAMonotype
 
 let rec polytype : type a. a type_t -> poly type_t = function
   | TUnit -> TUnit
