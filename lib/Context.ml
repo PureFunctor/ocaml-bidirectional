@@ -143,8 +143,8 @@ module WellFormed = struct
              | CSolved (n, t) ->
                 no_duplicates n collect_existentials && Result.is_ok (check_type es t)
 
-         | CMarker n ->
-            no_duplicates n collect_markers
+             | CMarker n ->
+                no_duplicates n collect_markers
            in aux continue' es
       in if aux true context then
            Ok ()
