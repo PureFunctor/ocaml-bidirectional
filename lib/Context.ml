@@ -63,14 +63,6 @@ let collect_existentials (type a) : a t -> string list = fun context ->
     | _ -> xs
   in collect predicate context
 
-(* let collect_existentials (type a) : a t -> string list = fun context -> *)
-(*   let predicate xs : a element -> _ = *)
-(*     function *)
-(*     | CExists x -> x :: xs *)
-(*     | CSolved (x, _) -> x :: xs *)
-(*     | _ -> xs *)
-(*   in collect predicate context *)
-
 let collect_unsolved (type a) : a t -> string list = fun context ->
   let predicate xs : a element -> _ =
     function
