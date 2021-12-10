@@ -67,13 +67,13 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
        that both `n` and `m` are members of Γ, this is required as
        denoted by the `Γ[a]` syntax in the original paper.
     *)
-    | TVar n, TVar m when n == m -> Ok gamma
+    | TVar n, TVar m when n = m -> Ok gamma
     (* <:Exvar
 
        Similar to <:Var, the well-formedness checks already determine
        that both `n` and `m` are members of Γ.
     *)
-    | TExists n, TExists m when n == m -> Ok gamma
+    | TExists n, TExists m when n = m -> Ok gamma
     (* <:->
 
        Notice how we "flip" subtyping in the argument position and in
@@ -130,7 +130,7 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
        2. It exists as a bound variable under the `t` type. This means
           that it appears on a forall quantifier.
     *)
-    | TExists n, t when not (StringSet.mem n (free_type_vars t)) ->
+    | TExists n, t when not (StringSet.mem n (free_type_vars t)) && (List.mem n (collect_existentials gamma)) ->
         instL gamma n t
     (* <:InstantiateR
 
@@ -147,6 +147,7 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
 
   and instL gamma alpha a =
     let* _ = WellFormed.check_type gamma a in
+    let* _ = WellFormed.check_type gamma (TExists alpha) in
     (* InstLSolve
 
        The premise for this rule states that existential type variables
@@ -210,6 +211,7 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
 
   and instR gamma a alpha =
     let* _ = WellFormed.check_type gamma a in
+    let* _ = WellFormed.check_type gamma (TExists alpha) in
     (* InstRSolve
 
        This is practically the same as instL, but with some of the
@@ -333,28 +335,19 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
      *)
     | EAbs (a, b) ->
        let a' = State.fresh_name () in
-
        let alpha = State.fresh_name () in
        let beta = State.fresh_name () in
 
        let* theta =
          check
-           (gamma
-            |> CMarker alpha
-            |> CExists alpha
-            |> CExists beta
-            |> CVar (a', (TExists alpha)))
+           (gamma |> CExists alpha |> CExists beta |> CVar (a', TExists alpha))
            (expr_subst (EVar a') a b)
            (TExists beta)
        in
 
-       let* (gammaL, gammaR) = break_at (CMarker alpha) theta in
+       let* delta = drop_marker (CVar (a', TExists alpha)) theta in
 
-       let tau = apply_context gammaL (TFun (TExists alpha, TExists beta)) in
-       let uns = collect_unsolved gammaL in
-       let uvr = List.init (List.length uns) (fun _ -> State.fresh_name ()) in
-       let sbt = List.fold_right (fun (n', n) t -> type_subst (TVar n') n t) (List.combine uvr uns) tau in
-       Ok (gammaR, List.fold_right (fun a b -> TForall (a, b)) uvr sbt)
+       Ok (delta, TFun (TExists alpha, TExists beta))
     (* ->E
 
        Type synthesis for function application is implemented as
@@ -374,8 +367,18 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
        expression, you can check whether it's a subtype
      *)
     | EAnn (e', t) -> let* theta = check gamma e' t in Ok (theta, t)
+    (* =>Let
+
+     *)
+    | ELet (v, n, t) ->
+       let m = State.fresh_name () in
+       let* (theta, n') = synth (gamma |> CMarker m) n in
+       let* (theta', n'') = synth (theta |> CVar (v, n')) t in
+       let* theta'' = drop_marker (CMarker m) theta' in
+       Ok (theta'', apply_context theta' n'')
 
   and synth_app gamma t e =
+    let _ = print_endline "synth_app death" in
     let* _ = WellFormed.check_type gamma t in
     match t with
     (* ∀App
