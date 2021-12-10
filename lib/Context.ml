@@ -154,7 +154,7 @@ end
 
 let solve_context (gamma : incomplete_t) (alpha : string) (tau : monotype_t) : (incomplete_t, [> error]) result =
   let* (gammaL, gammaR) = break_at (CExists alpha) gamma in
-  let* _ = WellFormed.check_type gammaL tau in
+  let* _ = WellFormed.check_type gammaR tau in
   let gammaR' = gammaR |> CSolved (alpha, tau) in
   Ok (List.append gammaL gammaR')
 
