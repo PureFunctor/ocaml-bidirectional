@@ -130,7 +130,7 @@ module MkTypeChecker (State : TypeCheckerState) : TypeChecker = struct
        2. It exists as a bound variable under the `t` type. This means
           that it appears on a forall quantifier.
     *)
-    | TExists n, t when not (StringSet.mem n (free_type_vars t)) && (List.mem n (collect_existentials gamma)) ->
+    | TExists n, t when not (StringSet.mem n (free_type_vars t)) ->
         instL gamma n t
     (* <:InstantiateR
 
