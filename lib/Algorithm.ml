@@ -14,10 +14,9 @@ type error =
 let fresh_name : unit -> string =
   let i = ref 0 in
   function () ->
-    let prefix = String.make 1 (Char.chr (97 + (!i / 26))) in
-    let suffix = string_of_int (!i mod 26) in
+    let suffix = string_of_int !i in
     incr i;
-    String.cat prefix suffix
+    String.cat "t" suffix
 
 let ( let* ) = Result.bind
 
